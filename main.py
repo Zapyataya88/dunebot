@@ -3,7 +3,7 @@ import asyncio
 import os
 import json
 from datetime import datetime, timedelta
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -14,7 +14,7 @@ from telegram.ext import (
 )
 
 # ==== НАСТРОЙКИ ====
-TOKEN = "7899510124:AAEMHtZUNKKTw17iURSw6uuv94mWjJL3Ypw"
+TOKEN = "798950124:AAEMHZUKKTWd7iURSw6uuv94mMj3LjYPw"
 CHAT_ID = -1002741668305
 THREAD_ID = 286
 DATA_FILE = "loot_data.json"
@@ -33,21 +33,21 @@ def save_data(data):
 loot_data = load_data()
 
 # ==== Команды ====
-async def start(update, context: ContextTypes.DEFAULT_TYPE):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton(sector, callback_data=sector)] for sector in loot_data.keys()]
     reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
     await update.message.reply_text(
-        "📜 Инструкция:\n🕐 Введи время в формате: `/lut G3 13:00`\n📌 Используй кнопку, чтобы посмотреть оставшееся время.",
+        "📦 Инструкция:\n🔹 Введи время в формате: `/lut G3 13:00`\n🔹 Используй кнопку, чтобы посмотреть оставшееся время.",
         reply_markup=reply_markup,
         parse_mode="Markdown"
     )
 
-async def reset(update, context: ContextTypes.DEFAULT_TYPE):
+async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     loot_data.clear()
     save_data(loot_data)
     await update.message.reply_text("✅ Все сектора были очищены.")
 
-async def handle_input(update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.text.startswith("/lut"):
         parts = update.message.text.split()
         if len(parts) == 3:
@@ -57,13 +57,13 @@ async def handle_input(update, context: ContextTypes.DEFAULT_TYPE):
                 r2 = r1 + timedelta(minutes=90)
                 loot_data[sector] = r1.strftime("%H:%M")
                 save_data(loot_data)
-                await update.message.reply_text(f"✅ Сектор {sector} сохранён: {r1.strftime('%H:%M')} - {r2.strftime('%H:%M')}")
+                await update.message.reply_text(f"📦 Сектор {sector} сохранён: {r1.strftime('%H:%M')} - {r2.strftime('%H:%M')}")
             except:
-                await update.message.reply_text("⚠️ Неверный формат времени. Пример: `/lut G3 13:00`", parse_mode="Markdown")
+                await update.message.reply_text("❌ Неверный формат времени. Пример: `/lut G3 13:00`", parse_mode="Markdown")
         else:
-            await update.message.reply_text("⚠️ Используй: `/lut <сектор> <время>`", parse_mode="Markdown")
+            await update.message.reply_text("❌ Используй: `/lut <сектор> <время>`", parse_mode="Markdown")
 
-async def button_handler(update, context: ContextTypes.DEFAULT_TYPE):
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     sector = query.data
@@ -74,10 +74,10 @@ async def button_handler(update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(
                 chat_id=CHAT_ID,
                 message_thread_id=THREAD_ID,
-                text=f"⚠️⚡ Скоро респ в секторе {sector}!\n🕐 Время: с {r1.strftime('%H:%M')} до {r2.strftime('%H:%M')}"
+                text=f"⚠️⚡ Скоро респ в секторе {sector}!\n🕒 Время: с {r1.strftime('%H:%M')} до {r2.strftime('%H:%M')}"
             )
         except Exception as e:
-            await query.edit_message_text(f"❗ Ошибка при разборе времени: {str(e)}")
+            await query.edit_message_text(f"❌ Ошибка при разборе времени: {str(e)}")
     else:
         await query.edit_message_text("❌ Нет сохранённых секторов.")
 
@@ -94,6 +94,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
