@@ -14,9 +14,9 @@ from telegram.ext import (
 )
 
 # ==== НАСТРОЙКИ ====
-TOKEN = "ВАШ_ТОКЕН"
-CHAT_ID = -100xxxxxxxxxx
-THREAD_ID = 123
+TOKEN = "7899510124:AAEMHtZUNKKTw17iURSw6uuv94mWjJL3Ypw"
+CHAT_ID = -1002741683005
+THREAD_ID = 286
 DATA_FILE = "loot_data.json"
 
 # ==== Загрузка и сохранение данных ====
