@@ -32,25 +32,26 @@ def save_data(data):
 
 loot_data = load_data()
 
-# ==== Кнопки ====
+# ==== Меню ====
 def get_main_menu():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("📥 Ввести время", callback_data="input_time")],
         [InlineKeyboardButton("📋 Показать список", callback_data="show_list")],
         [InlineKeyboardButton("❌ Удалить сектор", callback_data="delete_sector")],
-        [InlineKeyboardButton("♻️ Сброс", callback_data="reset_data")],
-        [InlineKeyboardButton("📘 Помощь / Инструкция", callback_data="help")]
+        [InlineKeyboardButton("📘 Помощь / Инструкция", callback_data="help")],
+        [InlineKeyboardButton("♻️ Сбросить всё", callback_data="reset")]
     ])
 
 def get_sector_menu():
-    return InlineKeyboardMarkup([
+    buttons = [
         [InlineKeyboardButton(sector, callback_data=f"sector_{sector}")]
         for sector in loot_data.keys()
-    ])
+    ]
+    return InlineKeyboardMarkup(buttons) if buttons else None
 
 def format_loot_list():
     if not loot_data:
-        return "❌ Нет сохранённых секторов."
+        return "❌ Нет сохранённых секторов. Выбери действие:"
     text = "📋 Список ящиков:\n"
     for s, t in loot_data.items():
         pickup = datetime.strptime(t, "%H:%M")
@@ -59,16 +60,21 @@ def format_loot_list():
         text += f"📦 {s}: ⏫ {t} ➜ ⏳ {r1} до {r2}\n"
     return text
 
-# ==== Хендлеры ====
+# ==== Команды ====
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Выбери действие:", reply_markup=get_main_menu())
 
+# ==== Обработка кнопок ====
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
     if query.data == "input_time":
-        await query.message.reply_text("Выбери сектор:", reply_markup=get_sector_menu())
+        sectors = get_sector_menu()
+        if sectors:
+            await query.message.reply_text("Выбери сектор:", reply_markup=sectors)
+        else:
+            await query.message.reply_text("Нет сохранённых секторов. Введите вручную: /loot H8 14:00")
 
     elif query.data.startswith("sector_"):
         sector = query.data.split("_")[1]
@@ -76,30 +82,34 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(f"🕓 Введи новое время для сектора {sector} (например: 14:00):")
 
     elif query.data == "show_list":
-        await query.message.reply_text(format_loot_list(), reply_markup=get_main_menu())
+        text = format_loot_list()
+        await query.message.reply_text(text, reply_markup=get_main_menu())
 
     elif query.data == "delete_sector":
-        if loot_data:
-            context.user_data["deleting"] = True
-            await query.message.reply_text("Выбери сектор для удаления:", reply_markup=get_sector_menu())
+        if not loot_data:
+            await query.message.reply_text("❌ Нет сохранённых секторов.")
         else:
-            await query.message.reply_text("❌ Нет сохранённых секторов.", reply_markup=get_main_menu())
+            await query.message.reply_text("Выбери сектор для удаления:", reply_markup=get_sector_menu())
+            context.user_data["deleting"] = True
 
-    elif query.data == "reset_data":
+    elif query.data == "reset":
         loot_data.clear()
         save_data(loot_data)
-        await query.message.reply_text("♻️ Все сектора сброшены.", reply_markup=get_main_menu())
+        await query.message.reply_text("♻️ Все данные сброшены.", reply_markup=get_main_menu())
 
     elif query.data == "help":
         help_text = (
-            "📘 Инструкция:\n"
-            "• Введи время в формате ЧЧ:ММ (например: 14:25)\n"
-            "• В начале недели добавь сектора вручную через /loot H8 14:00\n"
-            "• Затем бот покажет кнопки только для них\n"
-            "• Кнопка 'Сброс' удалит все сектора для новой недели"
+            "📘 Инструкция:\n\n"
+            "• Введи время в формате ЧЧ:MM (например: 14:25)\n"
+            "• Если ящик на корабле, добавь К перед сектором (например: КH8)\n\n"
+            "🧪 Лаборатория → просто H8\n"
+            "🚀 Корабль → КH8\n\n"
+            "📥 Добавить: /loot H8 14:00\n"
+            "♻️ Сбросить всё: кнопка «Сбросить»"
         )
         await query.message.reply_text(help_text, reply_markup=get_main_menu())
 
+# ==== Обработка сообщений ====
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.message_thread_id != THREAD_ID:
         return
@@ -117,13 +127,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"✅ Обновлено время для {sector}!\n⏫ {pickup.strftime('%H:%M')} ➜ ⏳ {r1} до {r2}"
             )
         except:
-            await update.message.reply_text("⚠️ Неверный формат времени. Используй HH:MM")
-
+            await update.message.reply_text("⚠️ Неверный формат времени. Используй HH:MM (например, 14:00)")
         await update.message.reply_text(format_loot_list(), reply_markup=get_main_menu())
 
     elif context.user_data.get("deleting"):
-        context.user_data.pop("deleting")
         sector = update.message.text.strip().upper()
+        context.user_data.pop("deleting", None)
         if sector in loot_data:
             del loot_data[sector]
             save_data(loot_data)
@@ -132,17 +141,27 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"❌ Сектор {sector} не найден.")
         await update.message.reply_text(format_loot_list(), reply_markup=get_main_menu())
 
-    elif update.message.text.startswith("/loot"):
-        try:
-            _, sector, time_str = update.message.text.strip().split()
-            pickup = datetime.strptime(time_str, "%H:%M")
-            loot_data[sector.upper()] = pickup.strftime("%H:%M")
-            save_data(loot_data)
-            await update.message.reply_text(f"✅ Добавлен сектор {sector.upper()} с временем {time_str}")
-        except:
-            await update.message.reply_text("❌ Формат: /loot H8 14:00")
+# ==== Быстрое добавление через команду ====
+async def add_loot(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if len(context.args) != 2:
+        await update.message.reply_text("Используй: /loot H8 14:00")
+        return
+    sector = context.args[0].upper()
+    time_str = context.args[1]
+    try:
+        pickup = datetime.strptime(time_str, "%H:%M")
+        loot_data[sector] = pickup.strftime("%H:%M")
+        save_data(loot_data)
+        r1 = (pickup + timedelta(minutes=45)).strftime("%H:%M")
+        r2 = (pickup + timedelta(minutes=90)).strftime("%H:%M")
+        await update.message.reply_text(
+            f"✅ Сектор {sector} добавлен!\n⏫ {pickup.strftime('%H:%M')} ➜ ⏳ {r1} до {r2}",
+            reply_markup=get_main_menu()
+        )
+    except:
+        await update.message.reply_text("⚠️ Неверный формат времени. Используй HH:MM")
 
-# ==== Уведомления ====
+# ==== Напоминания ====
 async def reminder_loop(app):
     while True:
         now = datetime.now().strftime("%H:%M")
@@ -153,28 +172,27 @@ async def reminder_loop(app):
                 await app.bot.send_message(
                     chat_id=CHAT_ID,
                     message_thread_id=THREAD_ID,
-                    text=f"⚡ Скоро респ в секторе {s}!\n⏰ Время: с {r1} до {r2}"
+                    text=f"⚡️⚡ Скоро респ в секторе {s}!\n⏰ Время: с {r1} до {r2}"
                 )
         await asyncio.sleep(60)
 
-# ==== Запуск ====
+# ==== Запуск для Render ====
+logging.basicConfig(level=logging.INFO)
+app = ApplicationBuilder().token(TOKEN).build()
+app.add_handler(CommandHandler("start", start))
+app.add_handler(CommandHandler("loot", add_loot))
+app.add_handler(CallbackQueryHandler(button_handler))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
 async def main():
-    logging.basicConfig(level=logging.INFO)
-    app = ApplicationBuilder().token(TOKEN).build()
-
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("loot", handle_message))
-    app.add_handler(CallbackQueryHandler(button_handler))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
     asyncio.create_task(reminder_loop(app))
-    print("✅ Бот запущен...")
-    await app.run_polling()
+    await app.initialize()
+    await app.start()
+    await app.updater.start_polling()
+    await app.updater.idle()
 
-# Для Replit без run_until_complete
-import nest_asyncio
-nest_asyncio.apply()
-asyncio.get_event_loop().run_until_complete(main())
+if __name__ == "__main__":
+    asyncio.run(main())
 
 
 
